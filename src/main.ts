@@ -33,42 +33,51 @@ for (let i = 0; i < r; i++) {
     }
 }
 
-const getCell = (cells) => (x: number, y:number): Cell | undefined => {
-    const row = cells[x];
+const getCell = (cells) => (root: Cell, offsetX: number, offsetY:number): Cell | undefined => {
 
-    if (!row) {
-        return;
-    }
+    const length = cells.length;
 
-    const col = row[y];
+    const rootX = root.x;
+    const rootY = root.y;
+    const desiredX = rootX+offsetX;
+    const desiredY = rootY+offsetY;
 
-    return col;
+    const computedX = desiredX < 0 ? length + desiredX : (desiredX > length-1) ? (length - desiredX) : desiredX;
+    const computedY = desiredY < 0 ? length + desiredY : (desiredY > length-1) ? (length - desiredY) : desiredY;
+
+    const col = cells[computedX];
+
+    if (!col) { return }
+
+    const row = col[computedY];
+
+    return row;
 }
 
-const get = getCell(cells);
+const getNeighbor = getCell(cells);
 
 // set neighbors for all cells.
 for (let i = 0; i < r*r; i++) {
 
+    const offset = 1;
     const x = i - ( Math.floor(i / r) * r );
     const y = Math.floor(i / r);
+    const self = {x, y} as Cell;
 
-    const self = get(x,y); 
+    const ul = getNeighbor(self, -offset, -offset);
+    const u = getNeighbor(self, 0, -offset);
+    const ur = getNeighbor(self, +offset, -offset);
 
-    const ul = get(x-1, y-1);
-    const u = get(x, y-1);
-    const ur = get(x+1, y-1);
+    const ml = getNeighbor(self, -offset, 0);
+    const mr = getNeighbor(self, +offset, 0);
 
-    const ml = get(x-1, y);
-    const mr = get(x+1, y);
-
-    const bl = get(x-1, y+1);
-    const b = get(x, y+1);
-    const br = get(x+1, y+1);
+    const bl = getNeighbor(self, -offset, +offset);
+    const b = getNeighbor(self, 0, +offset);
+    const br = getNeighbor(self, +offset, +offset);
 
     const neighbors = [ul,u,ur, ml,mr, bl,b,br];
 
-    self.setNeighbors(neighbors);
+    cells[x][y].setNeighbors(neighbors);
 
 }
 
@@ -87,19 +96,17 @@ function step(){
 }
 
 const ticker = app.ticker;
-const renderer = app.renderer;
-const stage = app.stage;
 
 ticker.autoStart = false;
 ticker.stop();
 
 step();
+step();
 
-
-function animate(time) {
+async function animate(time) {
     ticker.update(time);
     step();
-    // renderer.render(stage);
+
     requestAnimationFrame(animate);
 }
 

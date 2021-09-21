@@ -15,7 +15,7 @@ class Cell implements Cell {
     width = 0;
     height = 0;
     active = Math.floor(Math.random() * 20) === 1;
-    neighbors: Cell[];
+    neighbors: Cell[] = [];
     
     constructor(options){
 
@@ -25,11 +25,23 @@ class Cell implements Cell {
         this.height = options.height;
         
         this.graphics.interactive = true;
-        this.graphics.buttonMode = true;
+        // this.graphics.buttonMode = true;
 
-        this.graphics.on('pointerdown', () => {
-            this.active = true;
-        })
+        this.graphics.on('pointerover', () => {
+            this.neighbors.map(cell => {
+                cell.active = true;
+                cell.draw();
+            })
+        });
+
+        this.graphics.on('pointerout', () => {
+            this.neighbors.map(cell => {
+                cell.active = false;
+                cell.draw();
+            })
+        });
+
+        this.draw();
 
     };
 
@@ -37,6 +49,7 @@ class Cell implements Cell {
         this.graphics.clear();
         this.graphics.beginFill(this.active ? 0xFFFFFF : 0x000000);
         this.graphics.drawRect(this.x, this.y, this.width, this.height);
+
         this.graphics.endFill();        
     }
 
@@ -46,45 +59,33 @@ class Cell implements Cell {
 
     step(){
 
-        let neighbors = 0;
+        let activeNeighbors = 0;
 
         for (let i = 0; i < this.neighbors.length; i++) {
             const cell = this.neighbors[i];
 
-            if (!cell) {
-                continue;
-            }
-
-            if (neighbors >= 4) {
+            if (activeNeighbors > 4) {
                 break;
             }
 
             if (cell && cell.active){
-                neighbors+=1;
+                activeNeighbors+=1;
             }
         }
 
         const nextState = () => {
             if (this.active) {
-
-                if (neighbors <= 1) {
-                    return false;
-                }
     
-                if (neighbors >= 4 ) {
-                    return false;
-                }
-    
-                if (neighbors === 2 || neighbors === 3 ) {
+                if (activeNeighbors === 2 || activeNeighbors === 3 ) {
                     return true;
                 }
+
+                return false;
     
             }
     
-            if (this.active === false) {
-                if (neighbors === 3) {
-                    return true;
-                }
+            if (this.active === false && activeNeighbors === 3) {
+                return true;
             }
 
             return false;
