@@ -1,5 +1,9 @@
 import { Application, Assets, Container, Graphics, Sprite, Text } from "pixi.js";
 
+import * as waterAsset from './water.png';
+import * as mineAsset from './mine.png';
+
+
 interface BlockOptions {
   id: string;
   x: number;
@@ -11,7 +15,8 @@ interface BlockOptions {
 class Block {
   id: string;
 
-  graphics = new Graphics();
+  graphics: Sprite;
+  rect: unknown;
 
   mine = Math.floor(Math.random() * 20) === 1
 
@@ -26,24 +31,24 @@ class Block {
     this.y = options.y;
     this.width = options.width;
     this.height = options.height;
-
-    this.create(options.x, options.y, options.width, options.height);
   };
 
-  create(x, y, w, h) {
-    this.graphics.fill(this.mine ? "red" : "green");
-    this.graphics.rect(x, y, w, h);
+  async create() {
+    const waterTexture = await Assets.load(waterAsset);
+    const mineTexture = await Assets.load(mineAsset);
 
-    this.graphics.addChild(new Text({
-      text: this.id,
-      style: {
-        fontSize: 12,
-        align: 'center'
-      },
-      x: x,
-      y: y
-    }));
+    const graphic = new Sprite({
+      texture: this.mine ? mineTexture : waterTexture,
+      width: 64,
+      height: 64
+    });
 
+    graphic.anchor.set(0.5);
+
+    graphic.x = this.x;
+    graphic.y = this.y;
+
+    this.graphics = graphic;
   }
 
   hide() {
@@ -77,12 +82,12 @@ class World {
   x = 0;
   y = 0;
 
-  constructor(ops) {
+  constructor(ops: { x: number; y: number }) {
     this.x = ops.x;
     this.y = ops.y;
   }
 
-  generate() {
+  async generate() {
 
     for (let x = 0; x < this.visibleRadius; x++) {
       for (let y = 0; y < this.visibleRadius; y++) {
@@ -102,6 +107,8 @@ class World {
             width: blockSize,
             height: blockSize,
           });
+
+          await block.create();
 
           this.container.addChild(block.graphics);
 
@@ -162,16 +169,16 @@ class World {
     evt.preventDefault();
   })
 
-  world.generate();
+  await world.generate();
 
   // Listen for animate update
-  app.ticker.add((time) => {
+  app.ticker.add(async (time) => {
 
     if (world.x !== x || world.y !== y) {
       world.x = x;
       world.y = y;
 
-      world.generate();
+      await world.generate();
 
       world.container.x = app.screen.width / 2 - (world.visibleRadius * blockSize / 2) - (x * blockSize);
       world.container.y = app.screen.height / 2 - (world.visibleRadius * blockSize / 2) - (y * blockSize);
