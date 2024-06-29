@@ -5,7 +5,7 @@ import * as mineAsset from './mine.png';
 import * as boatAsset from './boat.png';
 
 const blockSize = 32;
-const visibleRadius = 5;
+const visibleRadius = 3;
 
 interface BlockOptions {
   id: string;
@@ -18,6 +18,7 @@ interface BlockOptions {
 class Block {
   id: string;
 
+  container = new Container();
   graphics: Sprite;
   rect: unknown;
 
@@ -46,6 +47,8 @@ class Block {
       height: blockSize
     });
 
+    this.container.addChild(graphic);
+
     graphic.anchor.set(0.5);
 
     graphic.alpha = 0.25;
@@ -57,9 +60,11 @@ class Block {
       text: 'h',
       x: this.x,
       y: this.y
-    })
+    });
 
-    graphic.addChild(text);
+    text.anchor.set(0.5)
+
+    this.container.addChild(text);
 
     this.graphics = graphic;
   }
@@ -110,7 +115,7 @@ class World {
 
           await block.create();
 
-          this.container.addChild(block.graphics);
+          this.container.addChild(block.container);
 
           this.blocks.set(blockId, block);
         }
