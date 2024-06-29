@@ -1,49 +1,53 @@
-import * as PIXI from 'pixi.js';
+import { Application } from 'pixi.js';
 
 import Cell from './cell';
 
-const vWidth = 1000;
-const vHeight = 1000;
-const r = 100;
+(async () => {
 
-const app = new PIXI.Application({
+  const vWidth = 1000;
+  const vHeight = 1000;
+  const r = 100;
+
+  const app = new Application();
+
+  await app.init({
+    height: vHeight,
     width: vWidth,
-    height:vHeight
-});
+    background: 'red'
+  })
 
-document.body.appendChild(app.view);
+  document.body.appendChild(app.canvas);
 
-const cells = [];
+  const cells: Cell[][] = [];
 
-
-for (let i = 0; i < r; i++) {
+  for (let i = 0; i < r; i++) {
     cells.push([]);
     for (let j = 0; j < r; j++) {
-        
-        const width = vWidth / r;
-        const height = vHeight / r;
-        const x = i*width;
-        const y = j*height;
 
-        const cell = new Cell({ x, y, width, height });
+      const width = vWidth / r;
+      const height = vHeight / r;
+      const x = i * width;
+      const y = j * height;
 
-        cells[i].push(cell)
+      const cell = new Cell({ x, y, width, height });
 
-        app.stage.addChild(cell.graphics);
+      cells[i].push(cell)
+
+      app.stage.addChild(cell.graphics);
     }
-}
+  }
 
-const getCell = (cells) => (root: Cell, offsetX: number, offsetY:number): Cell | undefined => {
+  const getCell = (cells: Cell[][]) => (root: Cell, offsetX: number, offsetY: number): Cell | undefined => {
 
     const length = cells.length;
 
     const rootX = root.x;
     const rootY = root.y;
-    const desiredX = rootX+offsetX;
-    const desiredY = rootY+offsetY;
+    const desiredX = rootX + offsetX;
+    const desiredY = rootY + offsetY;
 
-    const computedX = desiredX < 0 ? length + desiredX : (desiredX > length-1) ? (length - desiredX) : desiredX;
-    const computedY = desiredY < 0 ? length + desiredY : (desiredY > length-1) ? (length - desiredY) : desiredY;
+    const computedX = desiredX < 0 ? length + desiredX : (desiredX > length - 1) ? (length - desiredX) : desiredX;
+    const computedY = desiredY < 0 ? length + desiredY : (desiredY > length - 1) ? (length - desiredY) : desiredY;
 
     const col = cells[computedX];
 
@@ -52,17 +56,17 @@ const getCell = (cells) => (root: Cell, offsetX: number, offsetY:number): Cell |
     const row = col[computedY];
 
     return row;
-}
+  }
 
-const getNeighbor = getCell(cells);
+  const getNeighbor = getCell(cells);
 
-// set neighbors for all cells.
-for (let i = 0; i < r*r; i++) {
+  // set neighbors for all cells.
+  for (let i = 0; i < r * r; i++) {
 
     const offset = 1;
-    const x = i - ( Math.floor(i / r) * r );
+    const x = i - (Math.floor(i / r) * r);
     const y = Math.floor(i / r);
-    const self = {x, y} as Cell;
+    const self = { x, y } as Cell;
 
     const ul = getNeighbor(self, -offset, -offset);
     const u = getNeighbor(self, 0, -offset);
@@ -75,39 +79,45 @@ for (let i = 0; i < r*r; i++) {
     const b = getNeighbor(self, 0, +offset);
     const br = getNeighbor(self, +offset, +offset);
 
-    const neighbors = [ul,u,ur, ml,mr, bl,b,br];
+    const neighbors = [ul, u, ur, ml, mr, bl, b, br];
 
     cells[x][y].setNeighbors(neighbors);
 
-}
+  }
 
-function step(){
+  function step() {
     for (let i = 0; i < r; i++) {
-        for (let j = 0; j < r; j++) {
-    
-            const x = i;
-            const y = j;
-    
-            const self = cells[x][y]; 
-    
-            self.step();
-        }
+      for (let j = 0; j < r; j++) {
+
+        const x = i;
+        const y = j;
+
+        const self = cells[x][y];
+
+        self.step();
+      }
     }
-}
+  }
 
-const ticker = app.ticker;
+  const ticker = app.ticker;
 
-ticker.autoStart = false;
-ticker.stop();
+  // ticker.autoStart = false;
+  // ticker.stop();
 
-step();
-step();
+  // step();
+  // step();
 
-async function animate(time) {
-    ticker.update(time);
+  app.ticker.add((time) => {
     step();
+  })
 
-    requestAnimationFrame(animate);
-}
+  // async function animate(time) {
+  //   ticker.update(time);
+  //   step();
 
-animate(performance.now());
+  //   requestAnimationFrame(animate);
+  // }
+
+  // animate(performance.now());
+
+})()

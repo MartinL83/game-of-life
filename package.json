@@ -10,10 +10,10 @@
   "license": "ISC",
   "description": "",
   "devDependencies": {
-    "typescript": "^4.4.3"
+    "typescript": "^5.5.2"
   },
   "dependencies": {
-    "pixi.js": "^6.1.3",
-    "rxjs": "^7.3.0"
+    "parcel": "^2.12.0",
+    "pixi.js": "^8.2.1"
   }
 }
