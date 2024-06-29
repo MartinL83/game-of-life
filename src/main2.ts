@@ -2,7 +2,10 @@ import { Application, Assets, Container, Graphics, Sprite, Text } from "pixi.js"
 
 import * as waterAsset from './water.png';
 import * as mineAsset from './mine.png';
+import * as boatAsset from './boat.png';
 
+const blockSize = 32;
+const visibleRadius = 5;
 
 interface BlockOptions {
   id: string;
@@ -39,20 +42,26 @@ class Block {
 
     const graphic = new Sprite({
       texture: this.mine ? mineTexture : waterTexture,
-      width: 64,
-      height: 64
+      width: blockSize,
+      height: blockSize
     });
 
     graphic.anchor.set(0.5);
 
+    graphic.alpha = 0.25;
+
     graphic.x = this.x;
     graphic.y = this.y;
 
-    this.graphics = graphic;
-  }
+    const text = new Text({
+      text: 'h',
+      x: this.x,
+      y: this.y
+    })
 
-  hide() {
-    this.graphics.visible = false;
+    graphic.addChild(text);
+
+    this.graphics = graphic;
   }
 
   updatePos(x: number, y: number) {
@@ -60,24 +69,12 @@ class Block {
     this.y = y;
   }
 
-  show() {
-    this.graphics.visible = true;
-  }
-
-  destroy() {
-    this.graphics.destroy()
-  }
-
 }
-
-const blockSize = 64;
 
 class World {
   container = new Container();
 
   blocks = new Map<string, Block>();
-
-  visibleRadius = 3;
 
   x = 0;
   y = 0;
@@ -87,10 +84,13 @@ class World {
     this.y = ops.y;
   }
 
-  async generate() {
+  getBlock(x: number, y: number) {
+    return this.blocks.get(`${x}-${y}`);
+  }
 
-    for (let x = 0; x < this.visibleRadius; x++) {
-      for (let y = 0; y < this.visibleRadius; y++) {
+  async generate() {
+    for (let x = -visibleRadius; x < visibleRadius + 1; x++) {
+      for (let y = -visibleRadius; y < visibleRadius + 1; y++) {
 
         const posX = this.x + x;
         const posY = this.y + y;
@@ -123,29 +123,69 @@ class World {
   }
 }
 
+class User {
+  x: number;
+  y: number;
+  graphics: Sprite;
+
+  constructor() {
+    this.x = 0;
+    this.y = 0;
+  }
+
+  async create() {
+    const boatTexture = await Assets.load(boatAsset);
+
+    const graphic = new Sprite({
+      texture: boatTexture,
+      width: blockSize,
+      height: blockSize
+    });
+
+    graphic.anchor.set(0.5);
+
+    graphic.x = this.x;
+    graphic.y = this.y;
+
+    this.graphics = graphic;
+  }
+}
+
+let x = 0;
+let y = 0;
+
 (async () => {
 
   const app = new Application();
 
   await app.init({
-    background: "#ddd",
+    background: "#000",
     resizeTo: window
   });
 
-  let x = 0;
-  let y = 0;
+  const worldOffset = () => ({
+    x: app.screen.width / 2 - (visibleRadius * blockSize / 2) - (x * blockSize),
+    y: app.screen.height / 2 - (visibleRadius * blockSize / 2) - (y * blockSize)
+  });
+
+  document.body.appendChild(app.canvas);
 
   const world = new World({
     x,
     y
   });
 
-  world.container.x = app.screen.width / 2 - (world.visibleRadius * blockSize / 2) - x;
-  world.container.y = app.screen.height / 2 - (world.visibleRadius * blockSize / 2) - y;
+  world.container.x = worldOffset().x;
+  world.container.y = worldOffset().y;
 
-  document.body.appendChild(app.canvas);
+  const user = new User();
 
-  app.stage.addChild(world.container);
+  await user.create();
+
+  user.graphics.x = worldOffset().x;
+  user.graphics.y = worldOffset().y;
+
+  app.stage.addChild(world.container, user.graphics);
 
   window.document.addEventListener('keydown', (evt) => {
     const { key } = evt;
@@ -171,6 +211,12 @@ class World {
 
   await world.generate();
 
+  const b = world.getBlock(x, y);
+
+  if (b) {
+    b.graphics.alpha = 100;
+  }
+
   // Listen for animate update
   app.ticker.add(async (time) => {
 
@@ -180,8 +226,19 @@ class World {
 
       await world.generate();
 
-      world.container.x = app.screen.width / 2 - (world.visibleRadius * blockSize / 2) - (x * blockSize);
-      world.container.y = app.screen.height / 2 - (world.visibleRadius * blockSize / 2) - (y * blockSize);
+      // Update "camera"
+      world.container.x = worldOffset().x;
+      world.container.y = worldOffset().y;
+
+      const b = world.getBlock(x, y);
+
+      if (b) {
+        b.graphics.alpha = 100;
+      }
+
+      if (b?.mine) {
+        console.log('Game over');
+      }
 
     }
 
