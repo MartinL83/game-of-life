@@ -10,13 +10,8 @@ interface BlockOptions {
 
 class Block {
   id: string;
+
   graphics = new Graphics();
-  text = new Text({
-    style: {
-      fontSize: 12,
-      align: 'center'
-    }
-  });
 
   mine = Math.floor(Math.random() * 20) === 1
 
@@ -24,7 +19,6 @@ class Block {
   y = 0;
   width = 0;
   height = 0;
-  active = false;
 
   constructor(options: BlockOptions) {
     this.id = options.id;
@@ -33,40 +27,52 @@ class Block {
     this.width = options.width;
     this.height = options.height;
 
-    this.graphics.interactive = true;
-
-    // this.graphics.on('pointerover', (args) => {
-    //   console.log(args)
-    // });
-
-    // this.graphics.on('pointerout', (args) => {
-    //   console.log(args)
-    // });
-
-    this.draw();
-
+    this.create(options.x, options.y, options.width, options.height);
   };
 
-  draw() {
-    this.text.text = this.id;
-
-    this.text.x = this.x;
-    this.text.y = this.y;
-
+  create(x, y, w, h) {
     this.graphics.fill(this.mine ? "red" : "green");
-    this.graphics.rect(this.x, this.y, this.width, this.height);
-    this.graphics.addChild(this.text);
+    this.graphics.rect(x, y, w, h);
+
+    this.graphics.addChild(new Text({
+      text: this.id,
+      style: {
+        fontSize: 12,
+        align: 'center'
+      },
+      x: x,
+      y: y
+    }));
+
+  }
+
+  hide() {
+    this.graphics.visible = false;
+  }
+
+  updatePos(x: number, y: number) {
+    this.x = x;
+    this.y = y;
+  }
+
+  show() {
+    this.graphics.visible = true;
+  }
+
+  destroy() {
+    this.graphics.destroy()
   }
 
 }
 
+const blockSize = 64;
+
 class World {
-  blockSize = 64;
   container = new Container();
 
   blocks = new Map<string, Block>();
 
-  visibleRadius = 10;
+  visibleRadius = 3;
 
   x = 0;
   y = 0;
@@ -77,6 +83,7 @@ class World {
   }
 
   generate() {
+
     for (let x = 0; x < this.visibleRadius; x++) {
       for (let y = 0; y < this.visibleRadius; y++) {
 
@@ -90,23 +97,18 @@ class World {
         if (!block) {
           block = new Block({
             id: blockId,
-            x: 0,
-            y: 0,
-            width: this.blockSize,
-            height: this.blockSize,
+            x: posX * blockSize,
+            y: posY * blockSize,
+            width: blockSize,
+            height: blockSize,
           });
 
-          this.blocks.set(blockId, block)
+          this.container.addChild(block.graphics);
+
+          this.blocks.set(blockId, block);
         }
 
-        block.x = x * this.blockSize;
-        block.y = y * this.blockSize;
-
-        this.container.addChild(block.graphics);
-
-        block.draw();
-
-
+        block.updatePos(posX, posY)
       }
 
     }
@@ -131,8 +133,8 @@ class World {
     y
   });
 
-  world.container.x = app.screen.width / 2 - (world.visibleRadius * world.blockSize / 2) - x;
-  world.container.y = app.screen.height / 2 - (world.visibleRadius * world.blockSize / 2) - y;
+  world.container.x = app.screen.width / 2 - (world.visibleRadius * blockSize / 2) - x;
+  world.container.y = app.screen.height / 2 - (world.visibleRadius * blockSize / 2) - y;
 
   document.body.appendChild(app.canvas);
 
@@ -170,6 +172,10 @@ class World {
       world.y = y;
 
       world.generate();
+
+      world.container.x = app.screen.width / 2 - (world.visibleRadius * blockSize / 2) - (x * blockSize);
+      world.container.y = app.screen.height / 2 - (world.visibleRadius * blockSize / 2) - (y * blockSize);
+
     }
 
   });
