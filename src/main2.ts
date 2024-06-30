@@ -5,7 +5,8 @@ import * as mineAsset from './mine.png';
 import * as boatAsset from './boat.png';
 
 const blockSize = 32;
-const visibleRadius = 3;
+const visibility = 5;
+
 
 interface BlockOptions {
   id: string;
@@ -13,21 +14,28 @@ interface BlockOptions {
   y: number;
   width: number;
   height: number;
+  world: World;
 }
 
 class Block {
   id: string;
 
+  world: World;
+
   container = new Container();
   graphics: Sprite;
-  rect: unknown;
 
-  mine = Math.floor(Math.random() * 20) === 1
+  textNode = new Text();
+
+  mine = Math.floor(Math.random() * 5) === 1;
+  exposed = false;
 
   x = 0;
   y = 0;
   width = 0;
   height = 0;
+
+  neighbors = new Map<string, Block>();
 
   constructor(options: BlockOptions) {
     this.id = options.id;
@@ -35,14 +43,14 @@ class Block {
     this.y = options.y;
     this.width = options.width;
     this.height = options.height;
+    this.world = options.world;
   };
 
   async create() {
     const waterTexture = await Assets.load(waterAsset);
-    const mineTexture = await Assets.load(mineAsset);
 
     const graphic = new Sprite({
-      texture: this.mine ? mineTexture : waterTexture,
+      texture: waterTexture,
       width: blockSize,
       height: blockSize
     });
@@ -51,27 +59,27 @@ class Block {
 
     graphic.anchor.set(0.5);
 
-    graphic.alpha = 0.25;
+    graphic.alpha = 0.5;
 
     graphic.x = this.x;
     graphic.y = this.y;
 
-    const text = new Text({
-      text: 'h',
+    this.textNode = new Text({
       x: this.x,
-      y: this.y
+      y: this.y,
+      anchor: 0.5
     });
 
-    text.anchor.set(0.5)
-
-    this.container.addChild(text);
+    this.container.addChild(this.textNode);
 
     this.graphics = graphic;
   }
 
-  updatePos(x: number, y: number) {
-    this.x = x;
-    this.y = y;
+  async update() {
+    if (this.exposed && this.mine) {
+      const mineTexture = await Assets.load(mineAsset);
+      this.graphics.texture = mineTexture;
+    }
   }
 
 }
@@ -93,9 +101,13 @@ class World {
     return this.blocks.get(`${x}-${y}`);
   }
 
+  updateBlocks() {
+    this.blocks.forEach(block => block.update())
+  }
+
   async generate() {
-    for (let x = -visibleRadius; x < visibleRadius + 1; x++) {
-      for (let y = -visibleRadius; y < visibleRadius + 1; y++) {
+    for (let x = -visibility; x < visibility + 1; x++) {
+      for (let y = -visibility; y < visibility + 1; y++) {
 
         const posX = this.x + x;
         const posY = this.y + y;
@@ -111,6 +123,7 @@ class World {
             y: posY * blockSize,
             width: blockSize,
             height: blockSize,
+            world: this,
           });
 
           await block.create();
@@ -118,24 +131,65 @@ class World {
           this.container.addChild(block.container);
 
           this.blocks.set(blockId, block);
+
         }
-
-        block.updatePos(posX, posY)
       }
-
     }
 
   }
 }
+
+class Radar {
+  check(world: World) {
+    const radius = visibility - 2;
+
+    const worldX = world.x;
+    const worldY = world.y;
+
+    for (let x = worldX - radius; x < worldX + radius; x++) {
+      for (let y = worldY - radius; y < worldY + radius; y++) {
+
+        let count = 0;
+
+        for (let ix = x - 1; ix < x + 1; ix++) {
+          for (let iy = y - 1; iy < y + 1; iy++) {
+
+            const b = world.getBlock(ix, iy);
+
+            if (b?.mine) {
+              count += 1;
+            }
+
+          }
+        }
+
+        const ob = world.getBlock(x, y);
+
+        if (ob) {
+          ob.textNode.text = count ? count : '';
+        }
+
+      }
+    }
+
+
+
+  }
+}
+
 
 class User {
   x: number;
   y: number;
   graphics: Sprite;
 
-  constructor() {
-    this.x = 0;
-    this.y = 0;
+  radar: Radar;
+
+  constructor(x: number, y: number) {
+    this.x = x;
+    this.y = y;
+
+    this.radar = new Radar();
   }
 
   async create() {
@@ -147,7 +201,7 @@ class User {
       height: blockSize
     });
 
-    graphic.anchor.set(0.5);
+    // graphic.anchor.set(0.5);
 
     graphic.x = this.x;
     graphic.y = this.y;
@@ -155,6 +209,7 @@ class User {
     this.graphics = graphic;
   }
 }
+
 
 let x = 0;
 let y = 0;
@@ -168,10 +223,10 @@ let y = 0;
     resizeTo: window
   });
 
-  const worldOffset = () => ({
-    x: app.screen.width / 2 - (visibleRadius * blockSize / 2) - (x * blockSize),
-    y: app.screen.height / 2 - (visibleRadius * blockSize / 2) - (y * blockSize)
-  });
+  const worldOrigin = {
+    x: app.screen.width / 2,
+    y: app.screen.height / 2
+  };
 
   document.body.appendChild(app.canvas);
 
@@ -180,17 +235,15 @@ let y = 0;
     y
   });
 
-  world.container.x = worldOffset().x;
-  world.container.y = worldOffset().y;
-
-  const user = new User();
-
+  const user = new User(worldOrigin.x, worldOrigin.y);
   await user.create();
 
-  user.graphics.x = worldOffset().x;
-  user.graphics.y = worldOffset().y;
+  world.container.addChild(user.graphics);
 
-  app.stage.addChild(world.container, user.graphics);
+  world.container.x = worldOrigin.x;
+  world.container.y = worldOrigin.y;
+
+  app.stage.addChild(world.container);
 
   window.document.addEventListener('keydown', (evt) => {
     const { key } = evt;
@@ -216,35 +269,38 @@ let y = 0;
 
   await world.generate();
 
-  const b = world.getBlock(x, y);
+  user.radar.check(world);
 
-  if (b) {
-    b.graphics.alpha = 100;
-  }
-
-  // Listen for animate update
+  // World generation
   app.ticker.add(async (time) => {
-
     if (world.x !== x || world.y !== y) {
       world.x = x;
       world.y = y;
 
       await world.generate();
 
+      user.radar.check(world);
+
       // Update "camera"
-      world.container.x = worldOffset().x;
-      world.container.y = worldOffset().y;
+      // world.container.x = x;
+      // world.container.y = y;
+    }
+  })
 
-      const b = world.getBlock(x, y);
 
-      if (b) {
-        b.graphics.alpha = 100;
-      }
+  app.ticker.add(async (time) => {
 
-      if (b?.mine) {
-        console.log('Game over');
-      }
+    world.updateBlocks();
 
+    const b = world.getBlock(x, y);
+
+    if (b) {
+      b.graphics.alpha = 100;
+    }
+
+    if (b?.mine) {
+      b.exposed = true;
+      console.log('Game over');
     }
 
   });
