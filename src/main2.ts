@@ -89,35 +89,28 @@ class World {
 
   blocks = new Map<string, Block>();
 
-  x = 0;
-  y = 0;
-
-  constructor(ops: { x: number; y: number }) {
-    this.x = ops.x;
-    this.y = ops.y;
-  }
-
   getBlock(x: number, y: number) {
-    return this.blocks.get(`${x}-${y}`);
+    const blockId = `${x}-${y}`;
+    return this.blocks.get(blockId);
   }
 
   updateBlocks() {
     this.blocks.forEach(block => block.update())
   }
 
-  async generate() {
+  async generate(inputX: number, inputY: number) {
     for (let x = -visibility; x < visibility + 1; x++) {
       for (let y = -visibility; y < visibility + 1; y++) {
 
-        const posX = this.x + x;
-        const posY = this.y + y;
+        const posX = inputX + x;
+        const posY = inputY + y;
 
         const blockId = `${posX}-${posY}`;
 
-        let block = this.blocks.get(blockId);
+        const block = this.blocks.get(blockId);
 
         if (!block) {
-          block = new Block({
+          const newBlock = new Block({
             id: blockId,
             x: posX * blockSize,
             y: posY * blockSize,
@@ -126,12 +119,11 @@ class World {
             world: this,
           });
 
-          await block.create();
+          await newBlock.create();
 
-          this.container.addChild(block.container);
+          this.container.addChild(newBlock.container);
 
-          this.blocks.set(blockId, block);
-
+          this.blocks.set(blockId, newBlock);
         }
       }
     }
@@ -140,14 +132,11 @@ class World {
 }
 
 class Radar {
-  check(world: World) {
+  check(world: World, posX: number, posY: number) {
     const radius = visibility - 2;
 
-    const worldX = world.x;
-    const worldY = world.y;
-
-    for (let x = worldX - radius; x < worldX + radius; x++) {
-      for (let y = worldY - radius; y < worldY + radius; y++) {
+    for (let x = posX - radius; x < posX + radius; x++) {
+      for (let y = posY - radius; y < posY + radius; y++) {
 
         let count = 0;
 
@@ -192,6 +181,13 @@ class User {
     this.radar = new Radar();
   }
 
+  updatePosition(x: number, y: number) {
+    this.x = x;
+    this.y = y;
+    this.graphics.x = x;
+    this.graphics.y = y;
+  }
+
   async create() {
     const boatTexture = await Assets.load(boatAsset);
 
@@ -201,7 +197,7 @@ class User {
       height: blockSize
     });
 
-    // graphic.anchor.set(0.5);
+    graphic.anchor.set(0.5);
 
     graphic.x = this.x;
     graphic.y = this.y;
@@ -211,8 +207,8 @@ class User {
 }
 
 
-let x = 0;
-let y = 0;
+let currentPosX = 0;
+let currentPosY = 0;
 
 (async () => {
 
@@ -230,60 +226,68 @@ let y = 0;
 
   document.body.appendChild(app.canvas);
 
-  const world = new World({
-    x,
-    y
-  });
+  const world = new World();
 
   const user = new User(worldOrigin.x, worldOrigin.y);
+
   await user.create();
 
-  world.container.addChild(user.graphics);
+  // world.container.addChild(user.graphics);
 
-  world.container.x = worldOrigin.x;
-  world.container.y = worldOrigin.y;
+  user.graphics.zIndex = 10000;
 
-  app.stage.addChild(world.container);
+  app.stage.addChild(world.container, user.graphics);
+
+  app.stage.x = worldOrigin.x;
+  app.stage.y = worldOrigin.y;
+
+  let nextX = currentPosX;
+  let nextY = currentPosY;
 
   window.document.addEventListener('keydown', (evt) => {
     const { key } = evt;
 
     if (key === 'ArrowRight') {
-      x += 1;
+      nextX += 1;
     }
 
     if (key === 'ArrowLeft') {
-      x -= 1;
+      nextX -= 1;
     }
 
     if (key === 'ArrowUp') {
-      y -= 1;
+      nextY -= 1;
     }
 
     if (key === 'ArrowDown') {
-      y += 1;
+      nextY += 1;
     }
 
     evt.preventDefault();
   })
 
-  await world.generate();
+  await world.generate(currentPosX, currentPosY);
 
-  user.radar.check(world);
+  user.radar.check(world, currentPosX, currentPosY);
 
   // World generation
   app.ticker.add(async (time) => {
-    if (world.x !== x || world.y !== y) {
-      world.x = x;
-      world.y = y;
+    if (currentPosX !== nextX || currentPosY !== nextY) {
+      currentPosX = nextX;
+      currentPosY = nextY;
 
-      await world.generate();
+      user.updatePosition(
+        currentPosX * blockSize,
+        currentPosY * blockSize
+      );
 
-      user.radar.check(world);
+      await world.generate(currentPosX, currentPosY);
+
+      user.radar.check(world, currentPosX, currentPosY);
 
       // Update "camera"
-      // world.container.x = x;
-      // world.container.y = y;
+      // world.container.x = worldOrigin.x;
+      // world.container.y = worldOrigin.y;
     }
   })
 
@@ -292,7 +296,7 @@ let y = 0;
 
     world.updateBlocks();
 
-    const b = world.getBlock(x, y);
+    const b = world.getBlock(currentPosX, currentPosY);
 
     if (b) {
       b.graphics.alpha = 100;
